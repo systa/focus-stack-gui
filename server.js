@@ -40,7 +40,8 @@ function applyOptionsToArgs(options) {
     }
 
     if (value !== null && value !== undefined) {
-      args.push(flag, String(value));
+      // args.push(flag, String(value));
+      args.push(flag + "=" + String(value));
     }
   }
   return args;
@@ -90,21 +91,28 @@ app.post("/run", upload.array("files"), async (req, res) => {
     return res.status(400).json({ error: "outputFiles must be array" });
   }
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-stack-"));
+  //const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "focus-stack-"));
+  const tmpDir = ".";
   try {
     // Write uploaded input files to temp working folder
+    let inputFiles = [];
     for (const file of req.files || []) {
       const filePath = path.join(tmpDir, file.originalname);
+      console.log("Push " + file.originalname + " to " + tmpDir);
+      inputFiles.push(filePath);
       await fs.writeFile(filePath, file.buffer);
     }
 
     const flags = applyOptionsToArgs(options);
-    const finalArgs = [...args, ...flags];
+    const finalArgs = [...args, ...flags, ...inputFiles ];
 
     const stderrChunks = [];
     const stdoutChunks = [];
     let timedOut = false;
 
+    console.log(
+        `Spawning process: ${BINARY} ${finalArgs.join(" ")} (timeout: ${timeoutMs}ms, outputFiles: ${outputFiles.join(", ")})`
+    )
     const proc = spawn(BINARY, finalArgs, {
       cwd: tmpDir,
       stdio: ["pipe", "pipe", "pipe"],
