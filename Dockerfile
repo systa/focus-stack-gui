@@ -16,6 +16,7 @@ RUN npm install
 
 # copy server
 COPY server.js ./
+COPY index.html ./
 #COPY /usr/local/bin/focus-stack ./
 
 # If `focus stack` is local binary/script, copy it:

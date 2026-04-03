@@ -46,6 +46,10 @@ function applyOptionsToArgs(options) {
   return args;
 }
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "index.html"));
+});
+
 app.get("/health", (_req, res) => res.json({ status: "ok", binary: BINARY }));
 
 app.post("/run", upload.array("files"), async (req, res) => {

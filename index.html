@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Stack GUI</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        form { margin-bottom: 20px; }
+        label { display: block; margin-top: 10px; }
+        input, textarea, button { margin-top: 5px; padding: 8px; }
+        #results { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 20px; }
+        .output { margin: 10px 0; }
+        .download { background: #007bff; color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Focus Stack GUI</h1>
+    <form id="focusForm">
+        <label>Input Files:</label>
+        <input type="file" id="files" multiple accept="image/*">
+
+        <label>Arguments (JSON array):</label>
+        <textarea id="args" rows="2">["--output", "result.png"]</textarea>
+
+        <label>Options (JSON object):</label>
+        <textarea id="options" rows="3">{"quality": 90}</textarea>
+
+        <label>Output Files (JSON array):</label>
+        <textarea id="outputFiles" rows="2">["result.png"]</textarea>
+
+        <label>Timeout (ms):</label>
+        <input type="number" id="timeoutMs" value="120000">
+
+        <button type="submit">Run Focus Stack</button>
+    </form>
+
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('focusForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Processing...</p>';
+
+            const formData = new FormData();
+            const files = document.getElementById('files').files;
+            for (let file of files) {
+                formData.append('files', file);
+            }
+
+            formData.append('args', document.getElementById('args').value);
+            formData.append('options', document.getElementById('options').value);
+            formData.append('outputFiles', document.getElementById('outputFiles').value);
+            formData.append('timeoutMs', document.getElementById('timeoutMs').value);
+
+            try {
+                const response = await fetch('/run', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                let html = `<h2>Results</h2>`;
+                html += `<p>Exit Code: ${result.exitCode}</p>`;
+                if (result.signal) html += `<p>Signal: ${result.signal}</p>`;
+                if (result.stdout) html += `<p>Stdout: <pre>${result.stdout}</pre></p>`;
+                if (result.stderr) html += `<p class="error">Stderr: <pre>${result.stderr}</pre></p>`;
+
+                if (result.outputs) {
+                    html += `<h3>Outputs</h3>`;
+                    for (const [filename, output] of Object.entries(result.outputs)) {
+                        if (output.missing) {
+                            html += `<div class="output">${filename}: Missing</div>`;
+                        } else {
+                            const blob = new Blob([Uint8Array.from(atob(output.data), c => c.charCodeAt(0))]);
+                            const url = URL.createObjectURL(blob);
+                            html += `<div class="output">${filename}: <a href="${url}" download="${filename}" class="download">Download</a> (${output.size} bytes)</div>`;
+                        }
+                    }
+                }
+
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
