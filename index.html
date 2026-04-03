@@ -8,7 +8,9 @@
         body { font-family: Arial, sans-serif; margin: 20px; }
         form { margin-bottom: 20px; }
         label { display: block; margin-top: 10px; }
-        input, textarea, button { margin-top: 5px; padding: 8px; }
+        input, textarea, button, select { margin-top: 5px; padding: 8px; }
+        fieldset { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        legend { font-weight: bold; }
         #results { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 20px; }
         .output { margin: 10px 0; }
         .download { background: #007bff; color: white; text-decoration: none; padding: 5px 10px; border-radius: 3px; }
@@ -22,26 +24,66 @@
         <label>Input Files:</label>
         <input type="file" id="files" multiple accept="image/*">
 
-        <label>Arguments (JSON array):</label>
-        <textarea id="args" rows="2">["--output", "result.png"]</textarea>
+        <label>Arguments (JSON array, usually leave empty):</label>
+        <textarea id="args" rows="2">[]</textarea>
 
         <label>Options:</label>
         <div id="optionsForm">
-            <label>Quality: <input type="number" id="quality" value="90" min="1" max="100"></label><br>
-            <label>Output Format: 
-                <select id="outputFormat">
-                    <option value="png" selected>PNG</option>
-                    <option value="jpg">JPG</option>
-                    <option value="tiff">TIFF</option>
-                </select>
-            </label><br>
-            <label><input type="checkbox" id="verbose"> Verbose</label><br>
+            <fieldset>
+                <legend>Output Options</legend>
+                <label>Output Filename: <input type="text" id="output" value="result.png"></label><br>
+                <label>Depth Map: <input type="text" id="depthmap" placeholder="depthmap.png"></label><br>
+                <label>3D View: <input type="text" id="3dview" placeholder="3dview.png"></label><br>
+                <label><input type="checkbox" id="save-steps"> Save Intermediate Steps</label><br>
+                <label>JPG Quality: <input type="number" id="jpgquality" value="95" min="0" max="100"></label><br>
+                <label><input type="checkbox" id="nocrop"> No Crop</label><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>Image Alignment Options</legend>
+                <label>Reference Image Index: <input type="number" id="reference" value="0" min="0"></label><br>
+                <label><input type="checkbox" id="global-align"> Global Align</label><br>
+                <label><input type="checkbox" id="full-resolution-align"> Full Resolution Align</label><br>
+                <label><input type="checkbox" id="no-whitebalance"> No White Balance Correction</label><br>
+                <label><input type="checkbox" id="no-contrast"> No Contrast Correction</label><br>
+                <label><input type="checkbox" id="no-transform"> No Transform Correction</label><br>
+                <label><input type="checkbox" id="align-only"> Align Only</label><br>
+                <label><input type="checkbox" id="align-keep-size"> Align Keep Size</label><br>
+                <label><input type="checkbox" id="no-align"> No Align</label><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>Image Merge Options</legend>
+                <label>Consistency: <input type="number" id="consistency" value="2" min="0" max="2"></label><br>
+                <label>Denoise: <input type="number" id="denoise" value="1.0" step="0.1" min="0"></label><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>Depth Map Generation Options</legend>
+                <label>Depth Map Threshold: <input type="number" id="depthmap-threshold" value="10" min="0" max="255"></label><br>
+                <label>Depth Map Smooth XY: <input type="number" id="depthmap-smooth-xy" value="20" min="0"></label><br>
+                <label>Depth Map Smooth Z: <input type="number" id="depthmap-smooth-z" value="40" min="0"></label><br>
+                <label>Remove BG: <input type="number" id="remove-bg" value="0"></label><br>
+                <label>Halo Radius: <input type="number" id="halo-radius" value="20" min="0"></label><br>
+                <label>3D Viewpoint: <input type="text" id="3dviewpoint" value="1:1:1:2"></label><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>Performance Options</legend>
+                <label>Threads: <input type="number" id="threads" value="2" min="1"></label><br>
+                <label>Batch Size: <input type="number" id="batchsize" value="8" min="1"></label><br>
+                <label><input type="checkbox" id="no-opencl"> Disable OpenCL</label><br>
+                <label>Wait Images: <input type="number" id="wait-images" value="0.0" step="0.1" min="0"></label><br>
+            </fieldset>
+
+            <fieldset>
+                <legend>Information Options</legend>
+                <label><input type="checkbox" id="verbose"> Verbose</label><br>
+            </fieldset>
+
             <label>Advanced Options (JSON):</label>
             <textarea id="advancedOptions" rows="2" placeholder='{"other": "value"}'></textarea>
         </div>
-
-        <label>Output Files (JSON array):</label>
-        <textarea id="outputFiles" rows="2">["result.png"]</textarea>
 
         <label>Timeout (ms):</label>
         <input type="number" id="timeoutMs" value="120000">
@@ -65,12 +107,63 @@
 
             // Build options from form
             const options = {};
-            const quality = document.getElementById('quality').value;
-            if (quality) options.quality = parseInt(quality);
-            const outputFormat = document.getElementById('outputFormat').value;
-            if (outputFormat) options.output_format = outputFormat;
-            const verbose = document.getElementById('verbose').checked;
-            if (verbose) options.verbose = true;
+
+            // Output options
+            const output = document.getElementById('output').value.trim();
+            if (output) options.output = output;
+            const depthmap = document.getElementById('depthmap').value.trim();
+            if (depthmap) options.depthmap = depthmap;
+            const dview = document.getElementById('3dview').value.trim();
+            if (dview) options['3dview'] = dview;
+            if (document.getElementById('save-steps').checked) options['save-steps'] = true;
+            const jpgquality = document.getElementById('jpgquality').value;
+            if (jpgquality) options.jpgquality = parseInt(jpgquality);
+            if (document.getElementById('nocrop').checked) options.nocrop = true;
+
+            // Alignment options
+            const reference = document.getElementById('reference').value;
+            if (reference) options.reference = parseInt(reference);
+            if (document.getElementById('global-align').checked) options['global-align'] = true;
+            if (document.getElementById('full-resolution-align').checked) options['full-resolution-align'] = true;
+            if (document.getElementById('no-whitebalance').checked) options['no-whitebalance'] = true;
+            if (document.getElementById('no-contrast').checked) options['no-contrast'] = true;
+            if (document.getElementById('no-transform').checked) options['no-transform'] = true;
+            if (document.getElementById('align-only').checked) options['align-only'] = true;
+            if (document.getElementById('align-keep-size').checked) options['align-keep-size'] = true;
+            if (document.getElementById('no-align').checked) options['no-align'] = true;
+
+            // Merge options
+            const consistency = document.getElementById('consistency').value;
+            if (consistency) options.consistency = parseInt(consistency);
+            const denoise = document.getElementById('denoise').value;
+            if (denoise) options.denoise = parseFloat(denoise);
+
+            // Depth map options
+            const depthmapThreshold = document.getElementById('depthmap-threshold').value;
+            if (depthmapThreshold) options.depthmap_threshold = parseInt(depthmapThreshold);
+            const depthmapSmoothXy = document.getElementById('depthmap-smooth-xy').value;
+            if (depthmapSmoothXy) options.depthmap_smooth_xy = parseInt(depthmapSmoothXy);
+            const depthmapSmoothZ = document.getElementById('depthmap-smooth-z').value;
+            if (depthmapSmoothZ) options.depthmap_smooth_z = parseInt(depthmapSmoothZ);
+            const removeBg = document.getElementById('remove-bg').value;
+            if (removeBg) options.remove_bg = parseInt(removeBg);
+            const haloRadius = document.getElementById('halo-radius').value;
+            if (haloRadius) options.halo_radius = parseInt(haloRadius);
+            const viewpoint = document.getElementById('3dviewpoint').value.trim();
+            if (viewpoint) options['3dviewpoint'] = viewpoint;
+
+            // Performance options
+            const threads = document.getElementById('threads').value;
+            if (threads) options.threads = parseInt(threads);
+            const batchsize = document.getElementById('batchsize').value;
+            if (batchsize) options.batchsize = parseInt(batchsize);
+            if (document.getElementById('no-opencl').checked) options['no-opencl'] = true;
+            const waitImages = document.getElementById('wait-images').value;
+            if (waitImages) options.wait_images = parseFloat(waitImages);
+
+            // Information options
+            if (document.getElementById('verbose').checked) options.verbose = true;
+
             const advancedOptionsStr = document.getElementById('advancedOptions').value.trim();
             if (advancedOptionsStr) {
                 try {
@@ -82,9 +175,15 @@
                 }
             }
 
+            // Build outputFiles
+            const outputFiles = [];
+            if (output) outputFiles.push(output);
+            if (depthmap) outputFiles.push(depthmap);
+            if (dview) outputFiles.push(dview);
+
             formData.append('args', document.getElementById('args').value);
             formData.append('options', JSON.stringify(options));
-            formData.append('outputFiles', document.getElementById('outputFiles').value);
+            formData.append('outputFiles', JSON.stringify(outputFiles));
             formData.append('timeoutMs', document.getElementById('timeoutMs').value);
 
             try {
