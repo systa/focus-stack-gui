@@ -94,6 +94,19 @@
     <div id="results"></div>
 
     <script>
+        function getMimeType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'tiff': 'image/tiff',
+                'tif': 'image/tiff',
+                'bmp': 'image/bmp'
+            };
+            return mimeTypes[ext] || 'application/octet-stream';
+        }
+
         document.getElementById('focusForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const resultsDiv = document.getElementById('results');
@@ -205,9 +218,13 @@
                         if (output.missing) {
                             html += `<div class="output">${filename}: Missing</div>`;
                         } else {
-                            const blob = new Blob([Uint8Array.from(atob(output.data), c => c.charCodeAt(0))]);
-                            const url = URL.createObjectURL(blob);
-                            html += `<div class="output">${filename}: <a href="${url}" download="${filename}" class="download">Download</a> (${output.size} bytes)</div>`;
+                            const mimeType = getMimeType(filename);
+                            const dataUrl = `data:${mimeType};base64,${output.data}`;
+                            html += `<div class="output"><strong>${filename}</strong>: `;
+                            if (mimeType.startsWith('image/')) {
+                                html += `<br><img src="${dataUrl}" style="max-width: 100%; height: auto;" alt="${filename}">`;
+                            }
+                            html += `<br><a href="${dataUrl}" download="${filename}" class="download">Download</a> (${output.size} bytes)</div>`;
                         }
                     }
                 }
